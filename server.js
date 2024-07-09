@@ -3,6 +3,13 @@ const mongoose = require('mongoose')
 const Book = require('./book');
 const Joi = require('joi');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // limit each IP to 100 requests per windowMs
+});
+
 
 require('dotenv').config();
 
@@ -10,6 +17,7 @@ const app= express();
 
 app.use(express.json())
 app.use(helmet());
+app.use(limiter);
 
 const PORT = 3000;
 
