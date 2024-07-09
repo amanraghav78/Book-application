@@ -1,6 +1,7 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const Book = require('./book');
+const Joi = require('joi');
 
 require('dotenv').config();
 
@@ -12,6 +13,15 @@ const PORT = 3000;
 
 const uri = process.env.MONGODB_URI;
 
+function validateBook(book){
+    const schema= Joi.object({
+        title: Joi.string().min(3).required(),
+        author: Joi.string().min(3).required()
+    });
+
+    return schema.validate(book);
+}
+
 mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB...'))
   .catch(err => console.error('Could not connect to MongoDB...', err));
@@ -20,44 +30,43 @@ let books= [];
 
 //add a book
 app.post('/books', async (req, res) => {
-    const { title, author } = req.body;
 
-    if(!title || !author ){
-        return res.status(400).send("Missing title or author");
+    const { error } = validateBook(req.body); 
+    if(error){
+        return res.status(400).send(error.details[0].message);
     }
 
-    let book = new Book({ title: title, author: author});
-    book= await book.save();
-    res.send(book);
+    try{
+        let book = new Book({ title: req.body.title, author: req.body.author});
+        book= await book.save();
+        res.send(book);
+    } catch(err){
+        res.status(400).send(err.message);
+    }
 })
 
 //update the book
-app.put('/books/:id', (req, res) => {
-    const { title, author } = req.body;
+app.put('/books/:id', async (req, res) => {
 
-    const book= books.find((b) => b.id === parseInt(req.params.id));
+    const book= await Book.findByIdAndUpdate(req.params.id, { title: req.body.title, author: req.body.author }, { new: true});
 
     if(!book){
         return res.status(401).send('Book not found');
     }
-
-    book.title= title || book.title;
-    book.author= author || book.author;
 
     res.send(book);
 
 })
 
 //deleting a book
-app.delete('/books/:id', (req, res) => {
-    const bookIndex= books.findIndex((b) => b.id === parseInt (req.params.id));
+app.delete('/books/:id', async (req, res) => {
+    const book= await Book.findByIdAndDelete(req.params.id);
 
-    if(bookIndex === -1){
+    if(!book){
         return res.status(401).send('Book not found!');
     }
 
-    books.splice(bookIndex, 1);
-    res.status(204).send('Book deleted!');
+    res.status(204).send('Book deleted');
 })
 
 //get all the books
@@ -67,13 +76,16 @@ app.get('/books', async (req, res)=>{
 })
 
 //get a single book
-app.get('/books/:id', (req, res) => {
-    const book= books.find((b) => b.id === parseInt(req.params.id));
-    if(!book){
-        return res.status(404).send('Book not found');
+app.get('/books/:id', async (req, res) => {
+    try{
+        const book= await Book.findById(req.params.id);
+        if(!book){
+            return res.status(404).send('Book not found');
+        }
+        res.send(book);
+    } catch(err){
+        res.status(500).send('Something went wrong!');
     }
-
-    res.json(book);
 })
 
 app.get('/', (req, res) => {
