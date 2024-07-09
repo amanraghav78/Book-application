@@ -2,12 +2,14 @@ const express = require('express')
 const mongoose = require('mongoose')
 const Book = require('./book');
 const Joi = require('joi');
+const helmet = require('helmet');
 
 require('dotenv').config();
 
 const app= express();
 
 app.use(express.json())
+app.use(helmet());
 
 const PORT = 3000;
 
@@ -47,6 +49,11 @@ app.post('/books', async (req, res) => {
 
 //update the book
 app.put('/books/:id', async (req, res) => {
+
+    const { error } = validateBook(req.body);
+    if(error){
+        return res.status(400).send(error.details[0].message);
+    }
 
     const book= await Book.findByIdAndUpdate(req.params.id, { title: req.body.title, author: req.body.author }, { new: true});
 
